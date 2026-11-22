@@ -1,0 +1,24 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: lotus-ai-health
+    runtime: docker
+    plan: free            # free: no persistent disk; demo data is re-seeded on each restart
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: LOTUS_LLM_PROVIDER
+        value: mock       # set to openai | azure_openai | anthropic and add LOTUS_LLM_API_KEY to use a real model
+      - key: LOTUS_LLM_API_KEY
+        sync: false       # secret: entered in the Render dashboard, never committed
+      - key: LOTUS_LLM_MODEL
+        sync: false
+      - key: LOTUS_LLM_BASE_URL
+        sync: false
+      - key: LOTUS_SIMULATOR
+        value: "1"
+      - key: LOTUS_SIM_INTERVAL
+        value: "6"
+      - key: LOTUS_DATA_DIR
+        value: /data
