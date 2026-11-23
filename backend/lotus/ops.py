@@ -160,6 +160,9 @@ async def receive_denial(c: "Container", gen: "Generator", case_id: str, code: s
     async with c.repo.mutate(case_id) as cs:
         cs.denial = denial
         cs.status = CaseStatus.DENIED
+        if cs.origin_visit:
+            # Outcome learning: risks staff accepted on this claim were followed by a denial.
+            c.learner.record(cs.payer, cs.accepted_risks or ["no_open_risk"], denied=True)
         cs.log("DENIAL", f"{denial.code}: {denial.reason} Deadline {denial.deadline} (provisional)")
     c.blobs.put_bytes(case_id, "letters", "denial_notice.txt", text.encode())
     days = (date.fromisoformat(denial.deadline) - demo_today()).days
@@ -175,6 +178,8 @@ async def archive(c: "Container", case_id: str) -> None:
     async with c.repo.mutate(case_id) as cs:
         if cs.status not in (CaseStatus.ACKNOWLEDGED, CaseStatus.APPEAL_SENT):
             return
+        if cs.origin_visit and cs.status == CaseStatus.ACKNOWLEDGED and not cs.denial:
+            c.learner.record(cs.payer, cs.accepted_risks or ["no_open_risk"], denied=False)
         cs.status = CaseStatus.ARCHIVED
         cs.log("ARCHIVED", "Completed and archived")
     c.bus.publish("case.archived", "Case archived", f"{case_id} · completed and archived", case_id)

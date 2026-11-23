@@ -25,7 +25,12 @@ class Container:
         self.notifier = Notifier(self.store, self.bus)
         self.ledger = StageLedger(self.store)
         tracer.store = self.store
+        from .agents.coding import OutcomeLearner
+        from .workflows.visit import VisitRepo
+        self.visits = VisitRepo(self.store)
+        self.learner = OutcomeLearner(self.store)
         self.checkpointer: Any = None
+        self.visit_graph: Any = None
         self.intake: Any = None
         self.appeal: Any = None
 
@@ -36,3 +41,5 @@ class Container:
         self.checkpointer = checkpointer
         self.intake = build_intake_graph(self).compile(checkpointer=checkpointer)
         self.appeal = build_appeal_graph(self).compile(checkpointer=checkpointer)
+        from .workflows.visit import build_visit_graph
+        self.visit_graph = build_visit_graph(self).compile(checkpointer=checkpointer)

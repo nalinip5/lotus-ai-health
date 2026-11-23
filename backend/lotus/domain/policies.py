@@ -44,6 +44,15 @@ CATEGORY_TO_QUESTIONNAIRE = {
 }
 
 QUESTIONNAIRES: dict[str, Questionnaire] = {
+    "Q-TELEHEALTH": Questionnaire(
+        id="Q-TELEHEALTH", title="Telehealth professional claim — documentation", source="Payer telehealth policy",
+        item=[Q(linkId="TH", text="Telehealth visit is documented to payer requirements", type="group",
+                operator="all", item=[
+            Q(linkId="TH.1", text="Patient consent to telehealth documented", keywords=["consent"]),
+            Q(linkId="TH.2", text="Total time on the date of the encounter documented", keywords=["total time"]),
+            Q(linkId="TH.3", text="Patient location documented", keywords=["patient located", "located at"]),
+            Q(linkId="TH.4", text="Assessment supports the billed diagnosis", keywords=["assessment", "impression"]),
+        ])]),
     "Q-INPATIENT-NECESSITY": Questionnaire(
         id="Q-INPATIENT-NECESSITY", title="Inpatient level of care — medical necessity", source="Lotus demo criteria",
         item=[Q(linkId="LOC", text="Inpatient level of care is supported", type="group", operator="all", item=[

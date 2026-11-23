@@ -17,6 +17,7 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from .api.auth_routes import auth, team
 from .api.routes import public, router
+from .api.visit_routes import ingest, visits
 from .auth import LoginLimiter, UserStore
 from .config import settings
 from .container import Container
@@ -45,7 +46,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Lotus AI Health", version="0.1.0", lifespan=lifespan)
-for r in (public, auth, team, router):
+for r in (public, auth, team, ingest, visits, router):
     app.include_router(r)
 
 if DIST.exists():

@@ -19,6 +19,7 @@ HEADER_TO_TYPE = {
     "HISTORY AND PHYSICAL": "History & physical", "EMERGENCY DEPARTMENT NOTE": "ED documentation",
     "RADIOLOGY REPORT": "Imaging report", "LABORATORY RESULTS": "Lab results",
     "OPERATIVE NOTE": "Operative note", "PROGRESS NOTE": "Clinical note",
+    "TELEHEALTH VISIT NOTE": "Clinical note",
 }
 
 INJECTION = re.compile(r"ignore (all|previous|prior)|system prompt|developer mode|jailbreak|"
@@ -46,6 +47,28 @@ class MockLLM(LLM):
         for k in ("Patient Token", "Mrn", "Encounter"):
             sections.pop(k, None)
         return {"doc_type": doc_type, "confidence": 0.97 if first in HEADER_TO_TYPE else 0.5, "sections": sections}
+
+    # -- visit coding ---------------------------------------------------------
+    DX_LEXICON = [
+        ("acute sinusitis", "J01.90", "Acute sinusitis, unspecified"),
+        ("urinary tract infection", "N39.0", "Urinary tract infection, site not specified"),
+        ("essential hypertension", "I10", "Essential (primary) hypertension"),
+        ("generalized anxiety disorder", "F41.1", "Generalized anxiety disorder"),
+        ("contact dermatitis", "L25.9", "Unspecified contact dermatitis, unspecified cause"),
+        ("type 2 diabetes", "E11.9", "Type 2 diabetes mellitus without complications"),
+        ("pulpitis", "K04.0", "Pulpitis"),
+        ("dental caries", "K02.9", "Dental caries, unspecified"),
+    ]
+
+    def _t_code_visit_dx(self, c: dict) -> dict:
+        sections = split_sections(c["note"])
+        assessment = sections.get("Assessment", "")
+        out = []
+        for phrase, code, desc in self.DX_LEXICON:
+            if phrase in assessment.lower():
+                out.append({"icd10": code, "description": desc,
+                            "quote": find_sentence(assessment, [phrase]) or assessment})
+        return {"diagnoses": out}
 
     # -- summary --------------------------------------------------------------
     def _t_summarize_case(self, c: dict) -> dict:

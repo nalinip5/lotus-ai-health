@@ -79,8 +79,9 @@ def build_appeal_graph(c: "Container") -> StateGraph:
         with case_context(cid, state["correlation_id"]):
             case = c.repo.get(cid)
             assert case and case.denial
-            qid = state.get("questionnaire_id") or CATEGORY_TO_QUESTIONNAIRE.get(case.denial.category,
-                                                                                 "Q-DOC-COMPLETE")
+            qid = state.get("questionnaire_id") or (
+                "Q-TELEHEALTH" if case.claim_type == "professional"
+                else CATEGORY_TO_QUESTIONNAIRE.get(case.denial.category, "Q-DOC-COMPLETE"))
             resp, result = await evidence_for(c, case, qid)
             async with c.repo.mutate(cid) as cs:
                 cs.appeal.questionnaire_id, cs.appeal.response, cs.appeal.evaluation = qid, resp, result

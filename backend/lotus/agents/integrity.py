@@ -52,9 +52,13 @@ def identity_conflicts(case: Case) -> list[str]:
     return conflicts
 
 
+PROFESSIONAL_REQUIRED = ["Cover sheet", "Clinical note"]
+
+
 def checklist(case: Case) -> list[dict]:
     present = {d.classified_type or d.declared_type for d in case.documents}
-    return [{"doc_type": t, "present": t in present} for t in PAYERS[case.payer]["required"]]
+    required = PROFESSIONAL_REQUIRED if case.claim_type == "professional" else PAYERS[case.payer]["required"]
+    return [{"doc_type": t, "present": t in present} for t in required]
 
 
 def evaluate_readiness(case: Case) -> None:

@@ -12,6 +12,7 @@ from ..domain.models import CaseStatus
 from ..domain.policies import PAYERS
 from ..workflows.intake import run_intake
 from .generator import Generator
+from .visits import ADDENDA, VisitGenerator
 
 if TYPE_CHECKING:
     from ..container import Container
@@ -26,6 +27,9 @@ class Feed:
         self.gen = Generator(seed=seed + len(existing), start_case=max(existing, default=1000) + 1,
                              demo_today=ops.demo_today())
         self.rng = random.Random(seed)
+        vexisting = [int(x.split("-")[1]) for x in c.store.ids("visits")]
+        self.vgen = VisitGenerator(seed=seed + 100 + len(vexisting), start=max(vexisting, default=5000) + 1,
+                                   today=ops.demo_today())
         self.paused = False
         self.speed = 1
         self._task: asyncio.Task | None = None
@@ -81,7 +85,27 @@ class Feed:
             await ops.archive(c, cid)
         cid = await new([])
         await ops.submit(c, cid)
+        await self.seed_visits()
         ops.deadline_sweep(c)
+
+    async def seed_visits(self) -> None:
+        from ..workflows.visit import resume_visit, start_visit
+        c, vg = self.c, self.vgen
+        for gaps, spec, payer in ((["overcode", "no_mod95"], "medical", "UnitedHealthcare Choice+"),
+                                  (["consent"], "medical", "Aetna Choice POS"),
+                                  (["wrong_dx"], "medical", "Cigna HealthSpring"),
+                                  (["time"], "medical", "Humana Gold MA"),
+                                  ([], "dental", "BlueCross PPO"),
+                                  ([], "dental", "UnitedHealthcare Choice+"),
+                                  ([], "medical", "BlueCross PPO")):
+            v = vg.visit(gaps, spec, payer)
+            c.visits.save(v)
+            await start_visit(c, v.id)
+        # One clean visit already approved into a claim.
+        clean = vg.visit([], "medical", "Aetna Choice POS")
+        c.visits.save(clean)
+        await start_visit(c, clean.id)
+        await resume_visit(c, clean.id, {"action": "approve", "actor": "J. Rivera (staff)"})
 
     # ------------------------------------------------------------------ live
     async def step(self) -> None:
@@ -97,6 +121,10 @@ class Feed:
             choices += [(1.0, "deny"), (1.5, "archive")]
         if by(CaseStatus.AWAITING_RESCAN):
             choices.append((1.5, "rescan"))
+        choices.append((2.0, "visit"))
+        returned = [v for v in c.visits.all() if v.status.value == "returned"]
+        if returned:
+            choices.append((1.5, "addendum"))
         action = rng.choices([a for _, a in choices], weights=[w for w, _ in choices])[0]
         if action == "new":
             spec = self.gen.packet()
@@ -110,6 +138,18 @@ class Feed:
             await ops.receive_denial(c, self.gen, rng.choice(by(CaseStatus.ACKNOWLEDGED)).id)
         elif action == "archive":
             await ops.archive(c, rng.choice(by(CaseStatus.ACKNOWLEDGED)).id)
+        elif action == "visit":
+            from ..workflows.visit import start_visit
+            v = self.vgen.visit()
+            c.visits.save(v)
+            await start_visit(c, v.id)
+            c.bus.publish("visit.received", "Telehealth visit received", f"{v.id} · {v.clinician} · {v.payer}")
+        elif action == "addendum":
+            from ..workflows.visit import clinician_addendum
+            v = rng.choice(returned)
+            text = " ".join(ADDENDA[r.rule] for r in v.risks if r.needs_clinician and r.status == "open"
+                            and r.rule in ADDENDA) or "Documentation reviewed; no changes."
+            await clinician_addendum(c, v.id, text, v.clinician)
         elif action == "rescan":
             await ops.deliver_rescan(c, rng.choice(by(CaseStatus.AWAITING_RESCAN)).id)
         ops.deadline_sweep(c)

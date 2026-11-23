@@ -103,6 +103,8 @@ def dashboard(request: Request):
         "watchlist": [{"id": x.id, "deadline": x.denial.deadline, "days_left": _days_left(x),
                        "verified": x.denial.deadline_verified, "code": x.denial.code} for x in watch],
         "notifications": c.store.find("notifications", limit=4),
+        "visits": {"in_review": sum(1 for v in c.visits.all() if v.status.value == "review"),
+                   "claimed": sum(1 for v in c.visits.all() if v.status.value == "claimed")},
     }
 
 

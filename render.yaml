@@ -31,3 +31,5 @@ services:
         generateValue: true   # Render creates a random password; reveal it in the dashboard (Environment tab)
       - key: LOTUS_SESSION_SECRET
         generateValue: true   # signs session cookies
+      - key: LOTUS_INGEST_TOKEN
+        generateValue: true   # bearer token for the telehealth platform's visit ingest API

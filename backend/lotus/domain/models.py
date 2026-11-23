@@ -202,6 +202,9 @@ class Case(BaseModel):
     service_date: str
     billed: float
     scenario: Optional[str] = None  # synthetic generator scenario (demo only)
+    claim_type: Literal["institutional", "professional"] = "institutional"
+    origin_visit: Optional[str] = None          # Visit-to-Claim: the telehealth visit this claim came from
+    accepted_risks: list[str] = Field(default_factory=list)  # risk rules staff accepted at approval
     status: CaseStatus = CaseStatus.PROCESSING
     documents: list[Document] = Field(default_factory=list)
     findings: list[Finding] = Field(default_factory=list)

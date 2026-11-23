@@ -3,6 +3,7 @@ import { act, api, Me, setMe, useApi, useLive, useMe, useToasts } from "./api";
 import { Logo, SITE_URL } from "./brand";
 import Login, { ChangePassword } from "./pages/Login";
 import Team from "./pages/Team";
+import Visits, { VisitDetail } from "./pages/Visits";
 import Dashboard from "./pages/Dashboard";
 import Cases from "./pages/Cases";
 import CaseDetail from "./pages/CaseDetail";
@@ -70,16 +71,19 @@ function Console({ me }: { me: Me }) {
 
   const nav = [
     { key: "dashboard", label: "Dashboard" },
+    { key: "visits", label: "Visit-to-Claim", badge: data?.visits?.in_review },
     { key: "cases", label: "Cases" },
     { key: "appeals", label: "Appeals", badge: data?.kpis.pending_decisions },
     { key: "notifications", label: "Notifications", badge: data?.kpis.unread },
     ...(me.role === "admin" ? [{ key: "team", label: "Team" }] : []),
   ];
-  const active = route[0] === "case" ? "cases" : route[0];
+  const active = route[0] === "case" ? "cases" : route[0] === "visit" ? "visits" : route[0];
 
   let page;
   if (route[0] === "case" && route[1]) page = <CaseDetail id={route[1]} tab={route[2] || "summary"} />;
   else if (route[0] === "cases") page = <Cases />;
+  else if (route[0] === "visits") page = <Visits />;
+  else if (route[0] === "visit" && route[1]) page = <VisitDetail id={route[1]} />;
   else if (route[0] === "appeals") page = <Appeals />;
   else if (route[0] === "notifications") page = <Notifications />;
   else if (route[0] === "team") page = <Team />;
