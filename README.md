@@ -49,6 +49,28 @@ ingesting packets, submitting, acknowledging and denying claims. Pause it or cha
 
 ---
 
+## Access control
+
+The console is a **staff portal**: nothing is visible without signing in.
+
+| Role | Can do |
+|---|---|
+| **staff** | Dashboard, cases, exceptions, evidence chat, **prepare / approve / write off appeals**, notifications |
+| **admin** | Everything staff can, plus the **Team** page: add users, change roles, disable access, reset passwords |
+
+- The first admin is created on first start from `LOTUS_ADMIN_EMAIL` / `LOTUS_ADMIN_PASSWORD`. On Render the
+  password is generated (`generateValue`), so read it from the service's **Environment** tab. Locally, if it's
+  unset, a random one is printed once in the server log.
+- New users get a temporary password and must set their own at first sign-in.
+- Passwords: PBKDF2-SHA256 (600k iterations). Sessions: HMAC-signed HttpOnly cookie, 12 h, `SameSite=Lax`,
+  `Secure` on HTTPS. Changing a password, resetting it or disabling a user revokes their sessions.
+- 5 failed sign-ins per email (20 per IP) lock sign-in for 15 minutes. At least one active admin is always kept.
+- Every audit entry and appeal decision records the signed-in user (`Name (role)`), never a client-supplied name.
+- Only `/api/health` and `/api/auth/login` are public.
+
+> Free Render plan: the disk is not persistent, so team accounts added in the UI are lost on restart (the
+> env-configured admin is recreated). Attach a disk at `/data` on a paid plan to keep them.
+
 ## What's in the console
 
 | Screen | What it does |

@@ -15,7 +15,9 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
-from .api.routes import router
+from .api.auth_routes import auth, team
+from .api.routes import public, router
+from .auth import LoginLimiter, UserStore
 from .config import settings
 from .container import Container
 from .sim.feed import Feed
@@ -32,6 +34,9 @@ async def lifespan(app: FastAPI):
         container.attach_checkpointer(checkpointer)
         feed = Feed(container, seed=settings.seed)
         app.state.container, app.state.feed = container, feed
+        app.state.users = UserStore(container.store)
+        app.state.users.bootstrap()
+        app.state.login_limiter = LoginLimiter()
         await feed.seed()
         if settings.simulator_enabled:
             feed.start()
@@ -40,7 +45,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Lotus AI Health", version="0.1.0", lifespan=lifespan)
-app.include_router(router)
+for r in (public, auth, team, router):
+    app.include_router(r)
 
 if DIST.exists():
     app.mount("/assets", StaticFiles(directory=DIST / "assets"), name="assets")

@@ -10,11 +10,12 @@ import json
 from datetime import date
 from typing import Any, Literal, Optional
 
-from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
 from .. import fhir, ops
+from ..auth import User, actor, current_user, staff_or_admin
 from ..agents import appeal as appeal_agents
 from ..agents import chat as chat_agent
 from ..agents.evidence import evaluate
@@ -24,7 +25,9 @@ from ..domain.policies import QUESTIONNAIRES
 from ..workflows.appeal import evidence_for, pending_step, resume_appeal
 from ..workflows.intake import run_intake
 
-router = APIRouter(prefix="/api")
+public = APIRouter(prefix="/api")
+# Everything on `router` requires a signed-in admin or staff user.
+router = APIRouter(prefix="/api", dependencies=[Depends(current_user)])
 
 STATUS_LABEL = {
     "processing": "Processing", "exception": "Exception — blocked", "awaiting_rescan": "Awaiting rescan",
@@ -70,10 +73,9 @@ def row(case: Case) -> dict[str, Any]:
 
 
 # ------------------------------------------------------------------ meta
-@router.get("/health")
-def health(request: Request):
-    c = C(request)
-    return {"ok": True, "llm": c.llm.name, "cases": c.store.count("cases")}
+@public.get("/health")
+def health():
+    return {"ok": True}
 
 
 @router.get("/dashboard")
@@ -143,21 +145,21 @@ class Action(BaseModel):
 
 @router.post("/cases/{case_id}/actions")
 async def case_action(request: Request, case_id: str, body: Action,
-                      x_lotus_user: str = Header(default="demo-user")):
+                      user: User = Depends(staff_or_admin)):
     c, _ = C(request), _case(request, case_id)
     a = body.action
     if a == "mark_received":
-        await _guard(ops.mark_received(c, F(request).gen, case_id, body.doc_type or "", x_lotus_user))
+        await _guard(ops.mark_received(c, F(request).gen, case_id, body.doc_type or "", actor(user)))
     elif a == "request_rescan":
-        await _guard(ops.request_rescan(c, case_id, body.finding_id or "", x_lotus_user))
+        await _guard(ops.request_rescan(c, case_id, body.finding_id or "", actor(user)))
     elif a == "accept_finding":
-        await _guard(ops.accept_finding(c, case_id, body.finding_id or "", body.rationale, x_lotus_user))
+        await _guard(ops.accept_finding(c, case_id, body.finding_id or "", body.rationale, actor(user)))
     elif a == "reconcile_identity":
-        await _guard(ops.reconcile_identity(c, case_id, body.choice or "", body.rationale, x_lotus_user))
+        await _guard(ops.reconcile_identity(c, case_id, body.choice or "", body.rationale, actor(user)))
     elif a == "verify_deadline":
-        await _guard(ops.verify_deadline(c, case_id, x_lotus_user))
+        await _guard(ops.verify_deadline(c, case_id, actor(user)))
     elif a == "submit":
-        await _guard(ops.submit(c, case_id, x_lotus_user))
+        await _guard(ops.submit(c, case_id, actor(user)))
     return await get_case(request, case_id)
 
 
@@ -195,10 +197,10 @@ async def _expect_step(request: Request, case: Case, step: str) -> None:
 
 
 @router.post("/cases/{case_id}/appeal/prepare")
-async def prepare_appeal(request: Request, case_id: str, x_lotus_user: str = Header(default="demo-user")):
+async def prepare_appeal(request: Request, case_id: str, user: User = Depends(staff_or_admin)):
     case = _case(request, case_id)
     await _expect_step(request, case, "prepare")
-    await resume_appeal(C(request), case_id, {"action": "prepare", "actor": x_lotus_user})
+    await resume_appeal(C(request), case_id, {"action": "prepare", "actor": actor(user)})
     return await get_case(request, case_id)
 
 
@@ -209,7 +211,7 @@ class Decision(BaseModel):
 
 @router.post("/cases/{case_id}/appeal/decision")
 async def decide_appeal(request: Request, case_id: str, body: Decision,
-                        x_lotus_user: str = Header(default="demo-user")):
+                        user: User = Depends(staff_or_admin)):
     case = _case(request, case_id)
     step = await pending_step(C(request), case)
     if body.action == "approve":
@@ -222,20 +224,20 @@ async def decide_appeal(request: Request, case_id: str, body: Decision,
             raise HTTPException(409, "No open appeal decision")
         if not body.rationale.strip():
             raise HTTPException(409, "A write-off needs a rationale")
-    await resume_appeal(C(request), case_id, {"action": body.action, "actor": x_lotus_user,
+    await resume_appeal(C(request), case_id, {"action": body.action, "actor": actor(user),
                                               "rationale": body.rationale})
     return await get_case(request, case_id)
 
 
 @router.post("/cases/{case_id}/appeal/letter/remove-unverified")
-async def strip_unverified(request: Request, case_id: str, x_lotus_user: str = Header(default="demo-user")):
+async def strip_unverified(request: Request, case_id: str, user: User = Depends(staff_or_admin)):
     c = C(request)
     async with c.repo.mutate(case_id) as cs:
         if not cs.appeal.letter:
             raise HTTPException(409, "No draft letter")
         n = cs.appeal.letter.unverified
         cs.appeal.letter = appeal_agents.remove_unverified(cs)
-        cs.log("LETTER_EDITED", f"Removed {n} unverified assertion(s)", actor=x_lotus_user)
+        cs.log("LETTER_EDITED", f"Removed {n} unverified assertion(s)", actor=actor(user))
     return await get_case(request, case_id)
 
 

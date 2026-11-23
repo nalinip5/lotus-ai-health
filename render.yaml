@@ -22,3 +22,12 @@ services:
         value: "6"
       - key: LOTUS_DATA_DIR
         value: /data
+      # --- staff sign-in ---------------------------------------------------
+      - key: LOTUS_ADMIN_EMAIL
+        value: admin@lotusbpmhealth.com
+      - key: LOTUS_ADMIN_NAME
+        value: Lotus Admin
+      - key: LOTUS_ADMIN_PASSWORD
+        generateValue: true   # Render creates a random password; reveal it in the dashboard (Environment tab)
+      - key: LOTUS_SESSION_SECRET
+        generateValue: true   # signs session cookies

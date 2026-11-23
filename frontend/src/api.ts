@@ -1,17 +1,28 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
-export const USER = "demo-user";
+export class ApiError extends Error {
+  constructor(message: string, public status: number) { super(message); }
+}
 
-export class ApiError extends Error {}
+/* ---------- session: a tiny store the whole app listens to ---------- */
+export type Me = { email: string; name: string; role: "admin" | "staff"; must_change_password: boolean };
+let me: Me | null | undefined = undefined; // undefined = not checked yet
+const meListeners = new Set<() => void>();
+export function setMe(v: Me | null) { me = v; meListeners.forEach((l) => l()); if (!v) closeStream(); }
+export function useMe() {
+  return useSyncExternalStore((cb) => { meListeners.add(cb); return () => meListeners.delete(cb); }, () => me);
+}
 
-export async function api<T = any>(path: string, body?: unknown): Promise<T> {
+export async function api<T = any>(path: string, body?: unknown, method?: string): Promise<T> {
   const res = await fetch(`/api${path}`, {
-    method: body === undefined ? "GET" : "POST",
-    headers: { "content-type": "application/json", "x-lotus-user": USER },
+    method: method ?? (body === undefined ? "GET" : "POST"),
+    headers: { "content-type": "application/json" },
+    credentials: "same-origin",
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ApiError(typeof data.detail === "string" ? data.detail : `HTTP ${res.status}`);
+  if (res.status === 401 && !path.startsWith("/auth/login")) setMe(null);
+  if (!res.ok) throw new ApiError(typeof data.detail === "string" ? data.detail : `HTTP ${res.status}`, res.status);
   return data as T;
 }
 
@@ -23,8 +34,10 @@ const emit = () => listeners.forEach((l) => l());
 let es: EventSource | null = null;
 let timer: number | undefined;
 
+function closeStream() { es?.close(); es = null; connected = false; }
+
 function connect() {
-  if (es) return;
+  if (es || !me) return;
   es = new EventSource("/api/stream");
   es.addEventListener("hello", () => { connected = true; emit(); });
   const bump = () => {
@@ -37,7 +50,7 @@ function connect() {
 }
 
 export function useLive() {
-  connect();
+  connect();  // no-op until signed in
   return useSyncExternalStore(
     (cb) => { listeners.add(cb); return () => listeners.delete(cb); },
     () => `${tick}:${connected}`,
@@ -77,9 +90,9 @@ export function useToasts() {
   return useSyncExternalStore((cb) => { toastListeners.add(cb); return () => toastListeners.delete(cb); }, () => toasts);
 }
 
-export async function act<T = any>(path: string, body: unknown = {}, ok?: string): Promise<T | null> {
+export async function act<T = any>(path: string, body: unknown = {}, ok?: string, method?: string): Promise<T | null> {
   try {
-    const r = await api<T>(path, body);
+    const r = await api<T>(path, body, method);
     if (ok) toast(ok);
     refreshNow();
     return r;

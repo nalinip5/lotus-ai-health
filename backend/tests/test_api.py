@@ -8,8 +8,12 @@ def client(tmp_path, monkeypatch):
     from lotus import config
     monkeypatch.setattr(config.settings, "data_dir", tmp_path)
     monkeypatch.setattr(config.settings, "simulator_enabled", False)
+    monkeypatch.setenv("LOTUS_ADMIN_EMAIL", "admin@test.example")
+    monkeypatch.setenv("LOTUS_ADMIN_PASSWORD", "admin-pass-123")
     from lotus.main import app
     with TestClient(app) as c:
+        r = c.post("/api/auth/login", json={"email": "admin@test.example", "password": "admin-pass-123"})
+        assert r.status_code == 200, r.text
         yield c
 
 

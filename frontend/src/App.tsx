@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
-import { act, useApi, useLive, useToasts } from "./api";
+import { act, api, Me, setMe, useApi, useLive, useMe, useToasts } from "./api";
+import { Logo, SITE_URL } from "./brand";
+import Login, { ChangePassword } from "./pages/Login";
+import Team from "./pages/Team";
 import Dashboard from "./pages/Dashboard";
 import Cases from "./pages/Cases";
 import CaseDetail from "./pages/CaseDetail";
@@ -16,35 +19,51 @@ function useHash() {
   return hash;
 }
 
-export const SITE_URL = "https://lotusbpmhealth.vercel.app";
-
-function Logo() {
-  // Lotus BPM Health line mark (same as the main site)
+export default function App() {
+  const me = useMe();
+  const toasts = useToasts();
+  useEffect(() => { api<Me>("/auth/me").then(setMe).catch(() => setMe(null)); }, []);
+  let body;
+  if (me === undefined) body = <div className="empty">Loading…</div>;
+  else if (me === null) body = <Login />;
+  else if (me.must_change_password) body = <ChangePassword forced />;
+  else body = <Console me={me} />;
   return (
-    <svg viewBox="-1 0 42 31" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M20 1C24 5 26.5 9.5 26.3 14C26 19 23 23 20 25.5C17 23 14 19 13.7 14C13.5 9.5 16 5 20 1Z" />
-      <path d="M20 1V25.5" />
-      <path d="M20 25.5C14 22 9 17 8.6 11C8.5 8 8.8 5.5 9 3.5C11 4.3 13 5.6 14.6 7.4" />
-      <path d="M9 3.5L14.2 14" />
-      <path d="M20 25.5C26 22 31 17 31.4 11C31.5 8 31.2 5.5 31 3.5C29 4.3 27 5.6 25.4 7.4" />
-      <path d="M31 3.5L25.8 14" />
-      <path d="M20 25.5C13 25 6.5 23 4 18C3 16 2 14 1.6 12C4 11.8 6.3 12.3 8.4 13" />
-      <path d="M1.6 12L19 25" />
-      <path d="M20 25.5C27 25 33.5 23 36 18C37 16 38 14 38.4 12C36 11.8 33.7 12.3 31.6 13" />
-      <path d="M38.4 12L21 25" />
-      <path d="M20 25.5C16 28 12 29.6 8 29.4C5 29.2 2 27.6 0.5 26C2.5 24.6 5 23.5 8 23" />
-      <path d="M0.5 26C7 26.8 14 26.5 20 25.5" />
-      <path d="M20 25.5C24 28 28 29.6 32 29.4C35 29.2 38 27.6 39.5 26C37.5 24.6 35 23.5 32 23" />
-      <path d="M39.5 26C33 26.8 26 26.5 20 25.5" />
-    </svg>
+    <>
+      {body}
+      <div className="toasts">
+        {toasts.map((t) => <div key={t.id} className={`toast ${t.tone}`}>{t.text}</div>)}
+      </div>
+    </>
   );
 }
 
-export default function App() {
+function UserMenu({ me }: { me: Me }) {
+  const [open, setOpen] = useState(false);
+  const [pw, setPw] = useState(false);
+  return (
+    <div className="usermenu">
+      <button className="ghost" onClick={() => setOpen(!open)} aria-expanded={open}>
+        <span className="avatar">{me.name.slice(0, 1).toUpperCase()}</span>{me.name.split(" ")[0]}
+        <span className="rolechip">{me.role}</span>
+      </button>
+      {open && (
+        <div className="menu" onMouseLeave={() => setOpen(false)}>
+          <div className="dim mono">{me.email}</div>
+          <a href={SITE_URL} target="_blank" rel="noopener">Lotus BPM Health site ↗</a>
+          <button onClick={() => { setPw(true); setOpen(false); }}>Change password</button>
+          <button onClick={async () => { await api("/auth/logout", {}); setMe(null); }}>Sign out</button>
+        </div>
+      )}
+      {pw && <div className="modal"><ChangePassword onDone={() => setPw(false)} /></div>}
+    </div>
+  );
+}
+
+function Console({ me }: { me: Me }) {
   const hash = useHash();
   const live = useLive();
   const { data } = useApi<any>("/dashboard");
-  const toasts = useToasts();
   const route = hash.replace(/^#\//, "").split("/");
   const feed = data?.feed ?? { paused: false, speed: 1 };
   const connected = live.endsWith("true");
@@ -54,6 +73,7 @@ export default function App() {
     { key: "cases", label: "Cases" },
     { key: "appeals", label: "Appeals", badge: data?.kpis.pending_decisions },
     { key: "notifications", label: "Notifications", badge: data?.kpis.unread },
+    ...(me.role === "admin" ? [{ key: "team", label: "Team" }] : []),
   ];
   const active = route[0] === "case" ? "cases" : route[0];
 
@@ -62,6 +82,7 @@ export default function App() {
   else if (route[0] === "cases") page = <Cases />;
   else if (route[0] === "appeals") page = <Appeals />;
   else if (route[0] === "notifications") page = <Notifications />;
+  else if (route[0] === "team") page = <Team />;
   else page = <Dashboard data={data} />;
 
   return (
@@ -83,13 +104,13 @@ export default function App() {
           ))}
         </nav>
         <div className="feedctl">
-          <a className="sitelink" href={SITE_URL} target="_blank" rel="noopener">lotusbpmhealth ↗</a>
           <span className={`live ${feed.paused || !connected ? "off" : ""}`}>
             <i />{!connected ? "OFFLINE" : feed.paused ? "PAUSED" : "LIVE"}
           </span>
           <button className="ghost" onClick={() => act("/feed", { paused: !feed.paused })}>
             {feed.paused ? "Resume feed" : "Pause feed"}
           </button>
+          <UserMenu me={me} />
           <div className="seg">
             {[1, 2, 4].map((s) => (
               <button key={s} className={feed.speed === s ? "on" : ""} onClick={() => act("/feed", { speed: s })}>
@@ -108,9 +129,6 @@ export default function App() {
         <span>Lotus AI Health — the revenue-cycle console of <a href={SITE_URL} target="_blank" rel="noopener">Lotus BPM Health</a>.</span>
         <span>Synthetic demo data · <a href="/docs" target="_blank" rel="noopener">API docs</a></span>
       </footer>
-      <div className="toasts">
-        {toasts.map((t) => <div key={t.id} className={`toast ${t.tone}`}>{t.text}</div>)}
-      </div>
     </>
   );
 }
