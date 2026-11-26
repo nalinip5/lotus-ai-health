@@ -55,4 +55,7 @@ if DIST.exists():
     @app.get("/{path:path}", include_in_schema=False)
     def spa(path: str):
         f = DIST / path
-        return FileResponse(f if path and f.is_file() else DIST / "index.html")
+        if path and f.is_file():
+            return FileResponse(f)
+        # The shell must not be cached, so browsers pick up new hashed bundles right after a deploy.
+        return FileResponse(DIST / "index.html", headers={"Cache-Control": "no-cache"})
