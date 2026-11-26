@@ -81,7 +81,7 @@ function Console({ me }: { me: Me }) {
     { key: "cases", label: "Cases" },
     { key: "appeals", label: "Appeals", badge: data?.kpis.pending_decisions },
     { key: "notifications", label: "Notifications", badge: data?.kpis.unread },
-    ...(me.role === "admin" ? [{ key: "team", label: "Team" }] : []),
+    ...(me.role === "admin" && !me.auth_disabled ? [{ key: "team", label: "Team" }] : []),
   ];
   const active = route[0] === "case" ? "cases" : route[0] === "visit" ? "visits" : route[0];
 
@@ -92,7 +92,7 @@ function Console({ me }: { me: Me }) {
   else if (route[0] === "visit" && route[1]) page = <VisitDetail id={route[1]} />;
   else if (route[0] === "appeals") page = <Appeals />;
   else if (route[0] === "notifications") page = <Notifications />;
-  else if (route[0] === "team") page = <Team />;
+  else if (route[0] === "team" && !me.auth_disabled) page = <Team />;
   else page = <Dashboard data={data} />;
 
   return (

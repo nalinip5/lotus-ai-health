@@ -77,3 +77,7 @@ def test_open_demo_mode(app, monkeypatch):
         me = c.get("/api/auth/me").json()
         assert me["auth_disabled"] is True and me["role"] == "admin"
         assert c.get("/api/dashboard").status_code == 200 and c.get("/api/visits").status_code == 200
+        # No account management while anyone can open the console.
+        assert c.get("/api/users").status_code == 404
+        assert c.post("/api/users", json={"email": "x@y.z", "name": "x", "role": "admin",
+                                          "temporary_password": "long-enough-1"}).status_code == 404

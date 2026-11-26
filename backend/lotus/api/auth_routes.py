@@ -6,10 +6,17 @@ from typing import Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 
-from ..auth import COOKIE, User, admin_only, current_user, set_session_cookie
+from ..auth import COOKIE, User, admin_only, auth_disabled, current_user, set_session_cookie
+
+
+def team_enabled() -> None:
+    # In open demo mode every visitor is an admin, so account management is switched off entirely.
+    if auth_disabled():
+        raise HTTPException(404, "Team management is off while sign-in is disabled")
+
 
 auth = APIRouter(prefix="/api/auth")
-team = APIRouter(prefix="/api/users", dependencies=[Depends(admin_only)])
+team = APIRouter(prefix="/api/users", dependencies=[Depends(team_enabled), Depends(admin_only)])
 
 
 def U(request: Request):

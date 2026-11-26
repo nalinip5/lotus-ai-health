@@ -78,7 +78,8 @@ visit note ─▶ coding agent (ICD-10 + verbatim quote) ─▶ rules ─▶ ⏸
 The console is a **staff portal**: nothing is visible without signing in — unless open demo mode is on.
 
 > **Open demo mode (current Render setting):** `LOTUS_AUTH_DISABLED=1` turns sign-in off; every visitor acts
-> as an admin and can approve appeals. Set it to `0` in Render → Environment to require sign-in again.
+> as an admin and can approve appeals. The Team page and `/api/users` are switched off in this mode. Set it to
+> `0` in Render → Environment to require sign-in again (the Team page comes back with it).
 
 | Role | Can do |
 |---|---|
