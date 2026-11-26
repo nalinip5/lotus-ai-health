@@ -75,7 +75,10 @@ visit note ─▶ coding agent (ICD-10 + verbatim quote) ─▶ rules ─▶ ⏸
 
 ## Access control
 
-The console is a **staff portal**: nothing is visible without signing in.
+The console is a **staff portal**: nothing is visible without signing in — unless open demo mode is on.
+
+> **Open demo mode (current Render setting):** `LOTUS_AUTH_DISABLED=1` turns sign-in off; every visitor acts
+> as an admin and can approve appeals. Set it to `0` in Render → Environment to require sign-in again.
 
 | Role | Can do |
 |---|---|

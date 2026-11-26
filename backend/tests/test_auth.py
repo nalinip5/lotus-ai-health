@@ -69,3 +69,11 @@ def test_last_admin_and_rate_limit(app):
         for _ in range(5):
             assert c.post("/api/auth/login", json={**ADMIN, "password": "wrong-password"}).status_code == 401
         assert c.post("/api/auth/login", json=ADMIN).status_code == 429  # locked for 15 minutes
+
+
+def test_open_demo_mode(app, monkeypatch):
+    monkeypatch.setenv("LOTUS_AUTH_DISABLED", "1")
+    with TestClient(app) as c:
+        me = c.get("/api/auth/me").json()
+        assert me["auth_disabled"] is True and me["role"] == "admin"
+        assert c.get("/api/dashboard").status_code == 200 and c.get("/api/visits").status_code == 200

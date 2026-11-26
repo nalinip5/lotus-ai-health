@@ -6,6 +6,7 @@ Roles
 
 Every /api route except /api/health and /api/auth/login requires a signed-in
 user; there is no anonymous access to cases, letters or appeal approvals.
+Exception: LOTUS_AUTH_DISABLED=1 (open demo mode) treats every visitor as an admin.
 
 Passwords: PBKDF2-HMAC-SHA256 (600k iterations, per-user salt).
 Sessions:  HMAC-signed, HttpOnly, SameSite=Lax cookie (Secure on HTTPS), 12 h.
@@ -71,6 +72,7 @@ class User(BaseModel):
     must_change_password: bool = False
     created_at: str = ""
     last_login: Optional[str] = None
+    auth_disabled: bool = False
 
 
 class UserStore:
@@ -206,7 +208,19 @@ class LoginLimiter:
 
 
 # ------------------------------------------------------------------ dependencies
+def auth_disabled() -> bool:
+    """LOTUS_AUTH_DISABLED=1 opens the console to anyone with the link (demo mode, no sign-in)."""
+    return os.environ.get("LOTUS_AUTH_DISABLED", "0") == "1"
+
+
+OPEN_ACCESS_USER = User(id="open-access", email="demo@lotusbpmhealth.com", name="Demo User", role="admin",
+                        auth_disabled=True)
+
+
 def current_user(request: Request) -> User:
+    if auth_disabled():
+        request.state.user = OPEN_ACCESS_USER
+        return OPEN_ACCESS_USER
     users: UserStore = request.app.state.users
     data = read_session(request.cookies.get(COOKIE, ""))
     if not data:

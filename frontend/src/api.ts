@@ -5,7 +5,7 @@ export class ApiError extends Error {
 }
 
 /* ---------- session: a tiny store the whole app listens to ---------- */
-export type Me = { email: string; name: string; role: "admin" | "staff"; must_change_password: boolean };
+export type Me = { email: string; name: string; role: "admin" | "staff"; must_change_password: boolean; auth_disabled?: boolean };
 let me: Me | null | undefined = undefined; // undefined = not checked yet
 const meListeners = new Set<() => void>();
 export function setMe(v: Me | null) { me = v; meListeners.forEach((l) => l()); if (!v) closeStream(); }

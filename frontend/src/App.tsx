@@ -52,8 +52,14 @@ function UserMenu({ me }: { me: Me }) {
         <div className="menu" onMouseLeave={() => setOpen(false)}>
           <div className="dim mono">{me.email}</div>
           <a href={SITE_URL} target="_blank" rel="noopener">Lotus BPM Health site ↗</a>
-          <button onClick={() => { setPw(true); setOpen(false); }}>Change password</button>
-          <button onClick={async () => { await api("/auth/logout", {}); setMe(null); }}>Sign out</button>
+          {me.auth_disabled ? (
+            <div className="note">Open demo mode — sign-in is turned off, so everyone with the link acts as an admin.</div>
+          ) : (
+            <>
+              <button onClick={() => { setPw(true); setOpen(false); }}>Change password</button>
+              <button onClick={async () => { await api("/auth/logout", {}); setMe(null); }}>Sign out</button>
+            </>
+          )}
         </div>
       )}
       {pw && <div className="modal"><ChangePassword onDone={() => setPw(false)} /></div>}

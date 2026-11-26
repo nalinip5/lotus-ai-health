@@ -23,6 +23,8 @@ services:
       - key: LOTUS_DATA_DIR
         value: /data
       # --- staff sign-in ---------------------------------------------------
+      - key: LOTUS_AUTH_DISABLED
+        value: "1"            # open demo mode: no sign-in. Set to "0" to require admin/staff sign-in again
       - key: LOTUS_ADMIN_EMAIL
         value: admin@lotusbpmhealth.com
       - key: LOTUS_ADMIN_NAME
